@@ -16,8 +16,8 @@ import Examples.FourPointLattice as FPL
 --------------------------------------------------------------------------------
 
 ||| Generic file for keeping files of diffent level in same datastructure
-data GenFile : (lt: Type) -> Type where
-  MkGenFile : {l : lt} -> SecFile l -> GenFile lt
+GenFile : Type -> Type
+GenFile label = (l : label ** SecFile l)
 
 annotateStr : Either FileError String -> String
 annotateStr (Left error) = "Deduced information that no file with this name existed"
@@ -65,17 +65,10 @@ readTwoFiles file1 file2 {l} {l'} =
                         (_, Left e2) => Left e2
      plug {flow = leq_bot_x (join l l')} dio
 
-||| Get label from secure file
-getLabel : {l : labelType} -> SecFile l -> labelType
-getLabel {l} file = l
-
-||| Get label from generic file
-getLabelGen : GenFile labelType -> labelType
-getLabelGen (MkGenFile file) = getLabel file
-
 ||| Get list of labels from list of files.
 getLabels : List (GenFile labelType) -> List labelType
-getLabels xs = map getLabelGen xs
+getLabels [] = []
+getLabels ((l ** _) :: files) = l :: getLabels files
 
 ||| Get total join of a list of labels.
 getJoinOfLabels : BoundedJoinSemilattice labelType => List labelType -> labelType
@@ -106,9 +99,6 @@ addContent' c1 c2 =
                  (Left e1, Left e2) => Left $ e2 :: e1
                  (Left e1, Right c1) => Left e1
                  (Right c1', Left e2) => Left [e2]
-
-
-
 
 ||| A type which describes that a list is a sublist of another list
 data SubOrEqualList : List a -> List a -> Type where
@@ -177,13 +167,13 @@ readFiles {a} files
               -> (acc : DIO (Bottom {a}) (Labeled (joinOfFiles files) (Either (List FileError) String)))
               -> DIO (Bottom {a}) (Labeled (joinOfFiles files) (Either (List FileError) String))
   readFilesAcc [] acc = acc
-  readFilesAcc {subsetProf} (MkGenFile file :: xs) acc =
-    do labeledNewContent <- readFile file {flow = leq_bot_x (getLabel file)}
-       let subsetProofy : leq (getLabel file) (joinOfFiles ((MkGenFile file) :: xs))
-         = listElemProver {prf = Here} (getLabel file) (getLabels (MkGenFile file :: xs))
-       let trueProof : leq (getLabel file) (joinOfFiles files)
-         = subSuperListFlow (getLabel file) (getLabels files)
-                            (getLabels (MkGenFile file :: xs)) subsetProf subsetProofy
+  readFilesAcc {subsetProf} ((l ** file) :: xs) acc =
+    do labeledNewContent <- readFile file {flow = leq_bot_x l}
+       let subsetProofy : leq l (joinOfFiles ((l ** file) :: xs))
+         = listElemProver {prf = Here} l (getLabels ((l ** file) :: xs))
+       let trueProof : leq l (joinOfFiles files)
+         = subSuperListFlow l (getLabels files)
+                            (getLabels ((l ** file) :: xs)) subsetProf subsetProofy
        let content : DIO (joinOfFiles files) (Either FileError String)
          = unlabel {flow = trueProof} labeledNewContent
        let dioAcc : DIO (joinOfFiles files) (Either (List FileError) String)
@@ -201,10 +191,10 @@ readFiles' {a} files
               -> (acc : DIO (Bottom {a}) (Labeled (joinOfFiles files) (Either (List FileError) String)))
               -> DIO (Bottom {a}) (Labeled (joinOfFiles files) (Either (List FileError) String))
   readFilesAcc [] acc = acc
-  readFilesAcc (MkGenFile file :: xs) acc =
-    case decLeq (getLabel file) (joinOfFiles files) of --JIF actsfor check.
+  readFilesAcc ((l ** file) :: xs) acc =
+    case decLeq l (joinOfFiles files) of --JIF actsfor check.
       Yes prf =>
-        do labeledNewContent <- readFile file {flow = leq_bot_x (getLabel file)}
+        do labeledNewContent <- readFile file {flow = leq_bot_x l}
            let content = unlabel {flow = prf} labeledNewContent
            let uacc  = unlabel !acc {flow = reflexive (joinOfFiles files)}
            let acc' = plug {flow = leq_bot_x (joinOfFiles files)} $ addContent' uacc content
@@ -240,8 +230,8 @@ readAllFilesOfLevel {lt} level list =
                        -> (acc : List (SecFile level))
                        -> List (SecFile level)
   createListOfSameLevel [] acc = acc
-  createListOfSameLevel ((MkGenFile file) :: xs) acc
-    = case decEq level (getLabel file) of
+  createListOfSameLevel ((l ** file) :: xs) acc
+    = case decEq level l of
         Yes Refl => createListOfSameLevel xs (file :: acc)
         No contra => createListOfSameLevel xs acc
 
@@ -259,10 +249,10 @@ readAllFilesBelowLevel {a} list level =
               -> (acc : DIO (Bottom {a}) (Labeled level String))
               -> DIO (Bottom {a}) (Labeled level String)
   readFilesAcc [] acc = acc
-  readFilesAcc ((MkGenFile file) :: xs) acc =
-    case decLeq (getLabel file) level of
+  readFilesAcc ((l ** file) :: xs) acc =
+    case decLeq l level of
       (Yes prf) =>
-        do labeledNewContent <- readFile file {flow = (leq_bot_x (getLabel file))}
+        do labeledNewContent <- readFile file {flow = (leq_bot_x l)}
            let content : DIO level (Either FileError String)
              = unlabel labeledNewContent {flow = prf}
            let dioAcc : DIO level String
@@ -282,7 +272,7 @@ namespace tp
   publicFile = makeFile "tpPublicFile.txt"
 
   listOfFiles : List (GenFile TwoPoint)
-  listOfFiles = [MkGenFile secretFile, MkGenFile publicFile]
+  listOfFiles = [(_ ** secretFile), (_ ** publicFile)]
 
 namespace fp
   secretFile : SecFile FPL.H
@@ -298,10 +288,10 @@ namespace fp
   medium2File = makeFile "fpMedium2File.txt"
 
   listOfFilesH : List (GenFile FourPoint)
-  listOfFilesH = [MkGenFile medium1File, MkGenFile publicFile, MkGenFile medium2File]
+  listOfFilesH = [(_ ** medium1File), (_ ** publicFile), (_ ** medium2File)]
 
   listOfFilesM1 : List (GenFile FourPoint)
-  listOfFilesM1 = [MkGenFile medium1File, MkGenFile publicFile]
+  listOfFilesM1 = [(_ ** medium1File), (_ ** publicFile)]
 
 -- Silent fail on file errors
 stringOfEither : BoundedJoinSemilattice a
