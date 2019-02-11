@@ -1,0 +1,5 @@
+package depsec
+
+modules = DepSec, Examples
+
+opts = "-p pruviloj -p contrib --allow-capitalized-pattern-variables"
