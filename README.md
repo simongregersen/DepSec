@@ -3,10 +3,10 @@
 This repository contains DepSec, a dependently typed library for
 static information-flow control in Idris.
 
-This repository is the accompanying code for the POST'19 paper **A
+This repository is the accompanying code for the POST 2019 paper **A
 Dependently Typed Library for Static Information-Flow Control in
 Idris** by [Simon Gregersen](http://cs.au.dk/~gregersen), [Søren Eller
-Thomsen](http://cs.au.dk/~set94), and [Aslan
+Thomsen](http://cs.au.dk/~sethomsen), and [Aslan
 Askarov](http://askarov.net).
 
 ## Prerequisites
